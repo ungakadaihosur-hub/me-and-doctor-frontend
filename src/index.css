@@ -1,0 +1,35 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body {
+  background-color: #FAF6EE;
+  color: #16233D;
+}
+
+/* Signature element: every card in this app reads as a clinic paper
+   artifact — a token chit, a prescription slip, a receipt — with a
+   torn/perforated bottom edge instead of a plain rounded rectangle. */
+.chit {
+  position: relative;
+  background: #fff;
+  box-shadow: 0 1px 0 rgba(22,35,61,0.06), 0 6px 16px rgba(22,35,61,0.08);
+  border-radius: 2px;
+}
+
+.chit::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -6px;
+  height: 12px;
+  background-image: radial-gradient(circle at 6px 0, transparent 5px, #FAF6EE 5.5px);
+  background-size: 12px 12px;
+  background-repeat: repeat-x;
+}
+
+.token-number {
+  font-family: 'Fraunces', serif;
+  font-variant-numeric: tabular-nums;
+}
