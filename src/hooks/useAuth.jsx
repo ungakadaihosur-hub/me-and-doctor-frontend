@@ -20,6 +20,13 @@ export function AuthProvider({ children }) {
     setClaims(data.claims);
   }, []);
 
+  const devLogin = useCallback(async (phone) => {
+    const { data } = await api.post('/api/auth/dev-login', { phone });
+    localStorage.setItem('me_and_doctor_token', data.token);
+    localStorage.setItem('me_and_doctor_claims', JSON.stringify(data.claims));
+    setClaims(data.claims);
+  }, []);
+
   const logout = useCallback(() => {
     localStorage.removeItem('me_and_doctor_token');
     localStorage.removeItem('me_and_doctor_claims');
@@ -27,7 +34,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ claims, sendOtp, verifyOtp, logout }}>
+    <AuthContext.Provider value={{ claims, sendOtp, verifyOtp, devLogin, logout }}>
       {children}
     </AuthContext.Provider>
   );
