@@ -6,6 +6,10 @@ export default function Login() {
   const { sendOtp, verifyOtp } = useAuth();
   const navigate = useNavigate();
   const [phone, setPhone] = useState('');
+  const handlePhoneChange = (e) => {
+  const digitsOnly = e.target.value.replace(/\D/g, '').slice(0, 10);
+  setPhone(digitsOnly);
+};
   const [otp, setOtp] = useState('');
   const [stage, setStage] = useState('phone'); // phone -> otp
   const [error, setError] = useState('');
@@ -16,7 +20,7 @@ export default function Login() {
     setError('');
     setBusy(true);
     try {
-      await sendOtp(phone);
+      await sendOtp('+91' + phone);
       setStage('otp');
     } catch {
       setError('OTP அனுப்ப முடியவில்லை. மீண்டும் முயற்சிக்கவும்.');
@@ -30,7 +34,7 @@ export default function Login() {
     setError('');
     setBusy(true);
     try {
-      await verifyOtp(phone, otp);
+      await verifyOtp('+91' + phone, otp);
       navigate('/');
     } catch {
       setError('தவறான OTP. மீண்டும் முயற்சிக்கவும்.');
@@ -52,13 +56,16 @@ export default function Login() {
             <div>
               <label className="text-xs text-ink-soft font-tamil">மொபைல் எண் · Mobile number</label>
               <input
-                type="tel"
-                required
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="98xxxxxxxx"
-                className="mt-1 w-full border border-ink/15 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brass"
-              />
+  type="tel"
+  required
+  inputMode="numeric"
+  pattern="[0-9]{10}"
+  maxLength={10}
+  value={phone}
+  onChange={handlePhoneChange}
+  placeholder="98xxxxxxxx"
+  className="mt-1 w-full border border-ink/15 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brass"
+/>
             </div>
             {error && <p className="text-clay text-xs">{error}</p>}
             <button
