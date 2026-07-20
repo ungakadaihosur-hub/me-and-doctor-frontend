@@ -11,6 +11,10 @@ export default function Login() {
   setPhone(digitsOnly);
 };
   const [otp, setOtp] = useState('');
+  const handleOtpChange = (e) => {
+  const digitsOnly = e.target.value.replace(/\D/g, '').slice(0, 6);
+  setOtp(digitsOnly);
+};
   const [stage, setStage] = useState('phone'); // phone -> otp
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -80,13 +84,16 @@ export default function Login() {
             <div>
               <label className="text-xs text-ink-soft font-tamil">OTP</label>
               <input
-                type="text"
-                required
-                value={otp}
-                onChange={(e) => setOtp(e.target.value)}
-                placeholder="______"
-                className="mt-1 w-full border border-ink/15 rounded px-3 py-2 tracking-widest text-center focus:outline-none focus:ring-2 focus:ring-brass"
-              />
+  type="text"
+  required
+  inputMode="numeric"
+  pattern="[0-9]{4}"
+  maxLength={4}
+  value={otp}
+  onChange={handleOtpChange}
+  placeholder="____"
+  className="mt-1 w-full border border-ink/15 rounded px-3 py-2 tracking-widest text-center focus:outline-none focus:ring-2 focus:ring-brass"
+/>
             </div>
             {error && <p className="text-clay text-xs">{error}</p>}
             <button
