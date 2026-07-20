@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import logo from '../assets/logo.png';
 export default function Login() {
-  const { sendOtp, verifyOtp } = useAuth();
+  const { sendOtp, verifyOtp, devLogin } = useAuth();
   const navigate = useNavigate();
   const [phone, setPhone] = useState('');
   const handlePhoneChange = (e) => {
@@ -32,7 +32,22 @@ export default function Login() {
       setBusy(false);
     }
   };
-
+const handleDevLogin = async () => {
+  if (!phone || phone.length !== 10) {
+    setError('10 டிஜிட் மொபைல் நம்பர் போடுங்க');
+    return;
+  }
+  setError('');
+  setBusy(true);
+  try {
+    await devLogin('+91' + phone);
+    navigate('/');
+  } catch {
+    setError('Dev login தோல்வி');
+  } finally {
+    setBusy(false);
+  }
+};
   const handleVerify = async (e) => {
     e.preventDefault();
     setError('');
@@ -78,6 +93,14 @@ export default function Login() {
             >
               OTP அனுப்பு · Send OTP
             </button>
+            <button
+  type="button"
+  onClick={handleDevLogin}
+  disabled={busy}
+  className="w-full mt-2 border border-brass text-brass-deep rounded py-2 text-sm font-medium hover:bg-brass/10 disabled:opacity-50"
+>
+  Dev Login (skip OTP)
+</button>
           </form>
         ) : (
           <form onSubmit={handleVerify} className="space-y-4">
