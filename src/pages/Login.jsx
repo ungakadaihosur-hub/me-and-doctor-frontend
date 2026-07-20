@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-
+import logo from '../assets/logo.png';
 export default function Login() {
   const { sendOtp, verifyOtp } = useAuth();
   const navigate = useNavigate();
@@ -43,10 +43,10 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center bg-cream px-4">
       <div className="chit w-full max-w-sm px-8 py-10 mb-4">
         <div className="text-center mb-8">
-          <div className="font-display text-2xl text-ink">Me &amp; Doctor</div>
-          <div className="font-tamil text-sm text-brass-deep mt-1">Clinic OS</div>
-        </div>
-
+  <img src={logo} alt="Me & Doctor" className="mx-auto w-20 h-20 mb-2" />
+  <div className="font-display text-2xl text-ink">Me &amp; Doctor</div>
+  <div className="font-tamil text-sm text-brass-deep mt-1">Clinic OS</div>
+</div>
         {stage === 'phone' ? (
           <form onSubmit={handleSendOtp} className="space-y-4">
             <div>
