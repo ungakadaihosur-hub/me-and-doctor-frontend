@@ -20,6 +20,25 @@ export default function App() {
             <Route path="/billing" element={<Billing />} />
           </Route>
         </Routes>
+        <div
+          style={{
+            position: 'fixed',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            textAlign: 'center',
+            fontSize: '11px',
+            color: '#B8935A',
+            background: 'rgba(250,246,238,0.9)',
+            padding: '4px 0',
+            fontFamily: 'Inter, sans-serif',
+            letterSpacing: '0.02em',
+            pointerEvents: 'none',
+            zIndex: 50,
+          }}
+        >
+          Powered by UNGA KADAI DIGITAL
+        </div>
       </BrowserRouter>
     </AuthProvider>
   );
