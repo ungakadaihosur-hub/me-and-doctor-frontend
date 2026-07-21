@@ -1,19 +1,30 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import Header from '../components/Header';
-import { usePatientDetail, useVisits, usePrescriptions } from '../hooks/useClinicData';
+import { usePatientDetail, useVisits, usePrescriptions, useBilling } from '../hooks/useClinicData';
+
+const VISIT_STATUS_LABEL = { completed: 'முடிந்தது · Completed', cancelled: 'ரத்து · Cancelled' };
 
 export default function PatientDetail() {
   const { id } = useParams();
   const { patient, reload } = usePatientDetail(id);
-  const { addVisit } = useVisits(id);
+  const { addVisit, updateVisitStatus } = useVisits(id);
   const { lastRx, createPrescription, sharePrescription } = usePrescriptions(id);
+  const { recordPayment } = useBilling();
 
+  const [chiefComplaint, setChiefComplaint] = useState('');
   const [vitals, setVitals] = useState({ bp: '', sugar: '', weight: '' });
   const [notes, setNotes] = useState('');
+  const [diagnosis, setDiagnosis] = useState('');
+  const [followUpDate, setFollowUpDate] = useState('');
   const [medicines, setMedicines] = useState([{ name: '', dosage: '', frequency: '', duration: '' }]);
+  const [advice, setAdvice] = useState('');
   const [savedRx, setSavedRx] = useState(null);
+  const [savedVisit, setSavedVisit] = useState(null);
   const [saving, setSaving] = useState(false);
+
+  const [billing, setBilling] = useState({ consultation_fee: '', other_charges: '', discount: '', payment_mode: 'cash' });
+  const [billingSaved, setBillingSaved] = useState(false);
 
   const updateMedicine = (i, field, value) => {
     setMedicines((prev) => prev.map((m, idx) => (idx === i ? { ...m, [field]: value } : m)));
@@ -22,20 +33,35 @@ export default function PatientDetail() {
   const addMedicineRow = () => setMedicines((prev) => [...prev, { name: '', dosage: '', frequency: '', duration: '' }]);
 
   const repeatLast = () => {
-    if (lastRx) setMedicines(lastRx.medicines);
+    if (lastRx) {
+      setMedicines(lastRx.medicines);
+      if (lastRx.advice) setAdvice(lastRx.advice);
+    }
   };
 
   const handleSaveVisitAndRx = async () => {
     setSaving(true);
     try {
-      const visit = await addVisit({ soap_notes: notes, vitals });
+      const visit = await addVisit({
+        chief_complaint: chiefComplaint,
+        soap_notes: notes,
+        diagnosis,
+        vitals,
+        follow_up_date: followUpDate || null,
+      });
+      setSavedVisit(visit);
+
       const validMedicines = medicines.filter((m) => m.name.trim());
-      let rx = null;
       if (validMedicines.length) {
-        rx = await createPrescription(visit.id, validMedicines);
+        const rx = await createPrescription(visit.id, validMedicines, advice);
         setSavedRx(rx);
       }
+
+      setChiefComplaint('');
       setNotes('');
+      setDiagnosis('');
+      setFollowUpDate('');
+      setAdvice('');
       setVitals({ bp: '', sugar: '', weight: '' });
       setMedicines([{ name: '', dosage: '', frequency: '', duration: '' }]);
       reload();
@@ -48,44 +74,151 @@ export default function PatientDetail() {
     if (savedRx) await sharePrescription(savedRx.id);
   };
 
+  const handleCancelVisit = async (visitId) => {
+    await updateVisitStatus(visitId, 'cancelled');
+    reload();
+  };
+
+  const handleSaveBilling = async (e) => {
+    e.preventDefault();
+    if (!savedVisit) return;
+    await recordPayment(savedVisit.id, {
+      consultation_fee: Number(billing.consultation_fee || 0),
+      other_charges: Number(billing.other_charges || 0),
+      discount: Number(billing.discount || 0),
+      payment_mode: billing.payment_mode,
+    });
+    setBillingSaved(true);
+  };
+
   if (!patient) return null;
 
   return (
     <div>
       <Header title={patient.name} subtitle={`${patient.phone || '—'} · ${patient.age || '—'} y · ${patient.gender || '—'}`} />
 
+      {(patient.address || patient.blood_group || patient.allergies || patient.chronic_conditions || patient.emergency_contact) && (
+        <div className="px-8 pt-4">
+          <div className="chit px-5 py-4 flex flex-wrap gap-x-8 gap-y-1 text-sm">
+            {patient.blood_group && <span><span className="text-ink-soft">Blood group:</span> {patient.blood_group}</span>}
+            {patient.date_of_birth && <span><span className="text-ink-soft">DOB:</span> {patient.date_of_birth}</span>}
+            {patient.address && <span><span className="text-ink-soft">Address:</span> {patient.address}</span>}
+            {patient.emergency_contact && <span><span className="text-ink-soft">Emergency:</span> {patient.emergency_contact}</span>}
+            {patient.allergies && <span className="text-clay"><span className="text-ink-soft">Allergies:</span> {patient.allergies}</span>}
+            {patient.chronic_conditions && <span><span className="text-ink-soft">Chronic:</span> {patient.chronic_conditions}</span>}
+            {patient.notes && <span className="w-full"><span className="text-ink-soft">Notes:</span> {patient.notes}</span>}
+          </div>
+        </div>
+      )}
+
       <div className="px-8 py-6 grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Timeline */}
-        <div>
-          <h2 className="font-display text-lg text-ink mb-3">வருகை வரலாறு · Visit Timeline</h2>
-          <div className="space-y-3">
-            {(patient.recent_visits || []).length === 0 && (
-              <p className="text-sm text-ink-soft">முந்தைய வருகைகள் இல்லை.</p>
-            )}
-            {(patient.recent_visits || []).map((v) => (
-              <div key={v.id} className="chit px-5 py-4">
-                <div className="text-xs text-brass-deep">{new Date(v.visit_date).toLocaleDateString()}</div>
-                {v.soap_notes && <p className="text-sm text-ink mt-1">{v.soap_notes}</p>}
-                {v.vitals && (v.vitals.bp || v.vitals.sugar || v.vitals.weight) && (
-                  <div className="flex gap-4 mt-2 text-xs text-ink-soft">
-                    {v.vitals.bp && <span>BP: {v.vitals.bp}</span>}
-                    {v.vitals.sugar && <span>Sugar: {v.vitals.sugar}</span>}
-                    {v.vitals.weight && <span>Weight: {v.vitals.weight}</span>}
+        {/* The doctor's complete digital memory for this patient */}
+        <div className="space-y-8">
+          <div>
+            <h2 className="font-display text-lg text-ink mb-3">வருகை வரலாறு · Visit Timeline</h2>
+            <div className="space-y-3">
+              {(patient.recent_visits || []).length === 0 && (
+                <p className="text-sm text-ink-soft">முந்தைய வருகைகள் இல்லை.</p>
+              )}
+              {(patient.recent_visits || []).map((v) => (
+                <div key={v.id} className="chit px-5 py-4">
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs text-brass-deep">{new Date(v.visit_date).toLocaleDateString()}</div>
+                    <span className={`text-xs ${v.status === 'cancelled' ? 'text-clay' : 'text-sage'}`}>
+                      {VISIT_STATUS_LABEL[v.status] || v.status}
+                    </span>
                   </div>
-                )}
-              </div>
-            ))}
+                  {v.chief_complaint && <p className="text-xs text-ink-soft mt-1">CC: {v.chief_complaint}</p>}
+                  {v.diagnosis && <p className="text-sm text-ink font-medium mt-1">{v.diagnosis}</p>}
+                  {v.soap_notes && <p className="text-sm text-ink mt-1">{v.soap_notes}</p>}
+                  {v.follow_up_date && (
+                    <p className="text-xs text-clay mt-1">அடுத்த வருகை: {new Date(v.follow_up_date).toLocaleDateString()}</p>
+                  )}
+                  {v.vitals && (v.vitals.bp || v.vitals.sugar || v.vitals.weight) && (
+                    <div className="flex gap-4 mt-2 text-xs text-ink-soft">
+                      {v.vitals.bp && <span>BP: {v.vitals.bp}</span>}
+                      {v.vitals.sugar && <span>Sugar: {v.vitals.sugar}</span>}
+                      {v.vitals.weight && <span>Weight: {v.vitals.weight}</span>}
+                    </div>
+                  )}
+                  {v.status !== 'cancelled' && (
+                    <button onClick={() => handleCancelVisit(v.id)} className="mt-2 text-[11px] text-ink-soft hover:text-clay underline underline-offset-2">
+                      இந்த வருகையை ரத்து செய் · Cancel visit
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <h2 className="font-display text-lg text-ink mb-3">மருந்துச் சீட்டு வரலாறு · Prescription History</h2>
+            <div className="space-y-2">
+              {(patient.prescriptions || []).map((rx) => (
+                <div key={rx.id} className="chit px-5 py-3">
+                  <div className="text-xs text-brass-deep">{new Date(rx.created_at).toLocaleDateString()}</div>
+                  <div className="text-sm text-ink">{rx.medicines.map((m) => m.name).join(', ')}</div>
+                </div>
+              ))}
+              {(patient.prescriptions || []).length === 0 && <p className="text-sm text-ink-soft">சீட்டுகள் இல்லை.</p>}
+            </div>
+          </div>
+
+          <div>
+            <h2 className="font-display text-lg text-ink mb-3">கட்டண வரலாறு · Payment History</h2>
+            <div className="space-y-2">
+              {(patient.bills || []).map((b) => (
+                <div key={b.id} className="chit flex justify-between px-5 py-3">
+                  <div>
+                    <div className="text-xs text-brass-deep">{new Date(b.created_at).toLocaleDateString()}</div>
+                    {b.invoice_number && <div className="text-xs text-ink-soft">Invoice #{b.invoice_number}</div>}
+                  </div>
+                  <div className="text-right">
+                    <div className={`text-xs uppercase ${b.payment_status === 'paid' ? 'text-sage' : 'text-clay'}`}>{b.payment_status}</div>
+                    <div className="font-medium text-ink">₹{Number(b.amount).toLocaleString('en-IN')}</div>
+                  </div>
+                </div>
+              ))}
+              {(patient.bills || []).length === 0 && <p className="text-sm text-ink-soft">பில்கள் இல்லை.</p>}
+            </div>
+          </div>
+
+          <div>
+            <h2 className="font-display text-lg text-ink mb-3">பின்தொடர்தல் வரலாறு · Follow-up History</h2>
+            <div className="space-y-2">
+              {(patient.follow_up_history || []).map((f) => (
+                <div key={f.id} className="chit flex justify-between px-5 py-3">
+                  <span className="text-sm text-ink">{new Date(f.send_date).toLocaleDateString()}</span>
+                  <span className="text-xs text-ink-soft uppercase">{f.delivery_status || 'scheduled'}</span>
+                </div>
+              ))}
+              {(patient.follow_up_history || []).length === 0 && <p className="text-sm text-ink-soft">பின்தொடர்தல் இல்லை.</p>}
+            </div>
           </div>
         </div>
 
-        {/* New visit + prescription */}
+        {/* New visit + prescription + billing workflow */}
         <div>
           <h2 className="font-display text-lg text-ink mb-3">புதிய பரிசோதனை · New Visit</h2>
           <div className="chit px-5 py-5 space-y-4">
             <textarea
-              placeholder="குறிப்புகள் · Notes"
+              placeholder="வருகைக்கான காரணம் · Chief Complaint"
+              value={chiefComplaint}
+              onChange={(e) => setChiefComplaint(e.target.value)}
+              className="w-full border border-ink/15 rounded px-3 py-2 text-sm"
+              rows={2}
+            />
+            <textarea
+              placeholder="மருத்துவ குறிப்புகள் · Clinical Notes"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
+              className="w-full border border-ink/15 rounded px-3 py-2 text-sm"
+              rows={2}
+            />
+            <textarea
+              placeholder="நோய் கண்டறிதல் · Diagnosis"
+              value={diagnosis}
+              onChange={(e) => setDiagnosis(e.target.value)}
               className="w-full border border-ink/15 rounded px-3 py-2 text-sm"
               rows={2}
             />
@@ -96,6 +229,11 @@ export default function PatientDetail() {
                 className="border border-ink/15 rounded px-2 py-1.5 text-sm" />
               <input placeholder="Weight" value={vitals.weight} onChange={(e) => setVitals({ ...vitals, weight: e.target.value })}
                 className="border border-ink/15 rounded px-2 py-1.5 text-sm" />
+            </div>
+            <div>
+              <label className="text-xs text-ink-soft">அடுத்த வருகை தேதி · Follow-up Date</label>
+              <input type="date" value={followUpDate} onChange={(e) => setFollowUpDate(e.target.value)}
+                className="mt-1 w-full border border-ink/15 rounded px-3 py-2 text-sm" />
             </div>
 
             <div className="border-t border-ink/10 pt-4">
@@ -121,6 +259,14 @@ export default function PatientDetail() {
               <button onClick={addMedicineRow} type="button" className="text-xs text-ink-soft hover:text-ink">
                 + மருந்து சேர் · Add medicine
               </button>
+
+              <textarea
+                placeholder="ஆலோசனை · Advice (diet, rest, etc.)"
+                value={advice}
+                onChange={(e) => setAdvice(e.target.value)}
+                className="w-full border border-ink/15 rounded px-3 py-2 text-sm mt-2"
+                rows={2}
+              />
             </div>
 
             <button
@@ -136,7 +282,7 @@ export default function PatientDetail() {
                 <a href={`${import.meta.env.VITE_API_BASE_URL}/api/prescriptions/${savedRx.id}/pdf`}
                   target="_blank" rel="noreferrer"
                   className="flex-1 text-center border border-ink/15 rounded py-2 text-sm hover:bg-parchment">
-                  PDF பார்க்க
+                  PDF பார்க்க · Print
                 </a>
                 <button onClick={handleShare}
                   className="flex-1 bg-brass text-ink rounded py-2 text-sm font-medium hover:bg-brass-deep hover:text-cream">
@@ -144,6 +290,33 @@ export default function PatientDetail() {
                 </button>
               </div>
             )}
+
+            {savedVisit && !billingSaved && (
+              <form onSubmit={handleSaveBilling} className="border-t border-ink/10 pt-4 space-y-2">
+                <span className="text-sm font-medium text-ink">பில்லிங் · Billing for this visit</span>
+                <div className="grid grid-cols-3 gap-2">
+                  <input placeholder="Consultation Fee" type="number" value={billing.consultation_fee}
+                    onChange={(e) => setBilling({ ...billing, consultation_fee: e.target.value })}
+                    className="border border-ink/15 rounded px-2 py-1.5 text-sm" />
+                  <input placeholder="Other Charges" type="number" value={billing.other_charges}
+                    onChange={(e) => setBilling({ ...billing, other_charges: e.target.value })}
+                    className="border border-ink/15 rounded px-2 py-1.5 text-sm" />
+                  <input placeholder="Discount" type="number" value={billing.discount}
+                    onChange={(e) => setBilling({ ...billing, discount: e.target.value })}
+                    className="border border-ink/15 rounded px-2 py-1.5 text-sm" />
+                </div>
+                <select value={billing.payment_mode} onChange={(e) => setBilling({ ...billing, payment_mode: e.target.value })}
+                  className="w-full border border-ink/15 rounded px-3 py-2 text-sm bg-white">
+                  <option value="cash">Cash</option>
+                  <option value="upi">UPI</option>
+                  <option value="card">Card</option>
+                </select>
+                <button className="w-full bg-brass text-ink rounded py-2 text-sm font-medium hover:bg-brass-deep hover:text-cream">
+                  பில் சேமி · Save Bill
+                </button>
+              </form>
+            )}
+            {billingSaved && <p className="text-sm text-sage">பில் பதிவு செய்யப்பட்டது ✓</p>}
           </div>
         </div>
       </div>
