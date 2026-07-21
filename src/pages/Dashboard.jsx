@@ -1,77 +1,83 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import Header from '../components/Header';
-import { useQueue, usePatients } from '../hooks/useClinicData';
-
-const STATUS_LABEL = {
-  waiting: { ta: 'காத்திருக்கிறார்', en: 'Waiting', color: 'text-brass-deep' },
-  in_consultation: { ta: 'ஆலோசனையில்', en: 'In consultation', color: 'text-ink' },
-  done: { ta: 'முடிந்தது', en: 'Done', color: 'text-sage' },
-};
-
-const NEXT_STATUS = { waiting: 'in_consultation', in_consultation: 'done', done: 'done' };
+import api from '../lib/api';
 
 export default function Dashboard() {
-  const { tokens, issueToken, updateStatus } = useQueue();
-  const { patients } = usePatients();
-  const [selectedPatient, setSelectedPatient] = useState('');
+  const [stats, setStats] = useState(null);
 
-  const handleIssue = async () => {
-    await issueToken(selectedPatient || null);
-    setSelectedPatient('');
-  };
+  useEffect(() => {
+    api.get('/api/dashboard').then((res) => setStats(res.data));
+  }, []);
+
+  const cards = [
+    { label: 'இன்று நோயாளிகள்', sub: "Today's Patients", value: stats?.today_patient_count },
+    { label: 'வாக்-இன்', sub: 'Walk-ins', value: stats?.walk_ins_today },
+    { label: 'முடிந்த ஆலோசனைகள்', sub: 'Completed Visits', value: stats?.completed_visits_today },
+    { label: 'நிலுவை கட்டணம்', sub: 'Pending Payments', value: stats ? `${stats.pending_payments_count} · ₹${stats.pending_payments_amount.toLocaleString('en-IN')}` : undefined },
+  ];
 
   return (
     <div>
-      <Header title="இன்றைய வரிசை" subtitle="Today's Queue" />
+      <Header title="டாஷ்போர்டு" subtitle="Doctor Dashboard" />
 
       <div className="px-8 py-6">
-        <div className="flex gap-3 mb-8">
-          <select
-            value={selectedPatient}
-            onChange={(e) => setSelectedPatient(e.target.value)}
-            className="border border-ink/15 rounded px-3 py-2 flex-1 max-w-xs bg-white"
-          >
-            <option value="">Walk-in (இன்னும் பதிவு செய்யவில்லை)</option>
-            {patients.map((p) => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
-          </select>
-          <button
-            onClick={handleIssue}
-            className="bg-ink text-cream px-5 py-2 rounded font-medium hover:bg-ink-soft"
-          >
-            + புதிய டோக்கன் · New Token
-          </button>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6 max-w-3xl">
+          <div className="chit px-5 py-5">
+            <div className="text-xs text-ink-soft uppercase tracking-wide">இன்றைய வரவு</div>
+            <div className="token-number text-3xl text-ink mt-1">
+              {stats ? `₹${stats.today_revenue.toLocaleString('en-IN')}` : '—'}
+            </div>
+            <div className="text-[11px] text-ink-soft mt-1">Today's Revenue</div>
+          </div>
+          {cards.map((c) => (
+            <div key={c.sub} className="chit px-5 py-5">
+              <div className="text-xs text-ink-soft uppercase tracking-wide">{c.label}</div>
+              <div className="token-number text-3xl text-ink mt-1">{c.value ?? '—'}</div>
+              <div className="text-[11px] text-ink-soft mt-1">{c.sub}</div>
+            </div>
+          ))}
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-8">
-          {tokens.length === 0 && (
-            <p className="text-ink-soft text-sm col-span-full">
-              இன்று இன்னும் யாரும் இல்லை. புதிய டோக்கன் வழங்கத் தொடங்குங்கள்.
-            </p>
-          )}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-6">
+          <div>
+            <h2 className="font-display text-lg text-ink mb-3">சமீபத்திய நோயாளிகள் · Recent Patients</h2>
+            <div className="space-y-2">
+              {(stats?.recent_patients || []).map((p) => (
+                <Link key={p.id} to={`/patients/${p.id}`} className="chit flex justify-between px-5 py-3">
+                  <span className="text-ink">{p.name}</span>
+                  <span className="text-xs text-ink-soft">{p.phone || '—'}</span>
+                </Link>
+              ))}
+              {stats && stats.recent_patients.length === 0 && (
+                <p className="text-sm text-ink-soft">இன்னும் நோயாளிகள் இல்லை.</p>
+              )}
+            </div>
+          </div>
 
-          {tokens.map((t) => {
-            const status = STATUS_LABEL[t.status];
-            return (
-              <div key={t.id} className="chit px-5 py-4">
-                <div className="flex items-start justify-between">
-                  <div className="token-number text-3xl text-ink">{String(t.token_number).padStart(2, '0')}</div>
-                  <span className={`text-xs font-medium ${status.color}`}>{status.en}</span>
+          <div>
+            <h2 className="font-display text-lg text-ink mb-3">வரும் பின்தொடர்தல் · Upcoming Follow-ups</h2>
+            <div className="space-y-2">
+              {(stats?.upcoming_follow_ups || []).map((f) => (
+                <div key={f.id} className="chit flex justify-between px-5 py-3">
+                  <span className="text-ink">{f.patients?.name}</span>
+                  <span className="text-xs text-brass-deep">{new Date(f.follow_up_date).toLocaleDateString()}</span>
                 </div>
-                <div className="mt-2 text-sm text-ink">{t.patients?.name || 'Walk-in'}</div>
+              ))}
+              {stats && stats.upcoming_follow_ups.length === 0 && (
+                <p className="text-sm text-ink-soft">அடுத்த 7 நாட்களில் பின்தொடர்தல் இல்லை.</p>
+              )}
+            </div>
+          </div>
+        </div>
 
-                {t.status !== 'done' && (
-                  <button
-                    onClick={() => updateStatus(t.id, NEXT_STATUS[t.status])}
-                    className="mt-4 text-xs font-medium text-brass-deep hover:text-ink underline underline-offset-2"
-                  >
-                    {t.status === 'waiting' ? 'ஆலோசனை தொடங்கு →' : 'முடிந்தது என குறி →'}
-                  </button>
-                )}
-              </div>
-            );
-          })}
+        <div className="flex gap-6 mt-10">
+          <Link to="/queue" className="text-sm text-brass-deep hover:text-ink underline underline-offset-2">
+            இன்றைய வரிசைக்குச் செல் · Go to Today's Queue →
+          </Link>
+          <Link to="/reports" className="text-sm text-brass-deep hover:text-ink underline underline-offset-2">
+            அறிக்கைகள் · View Reports →
+          </Link>
         </div>
       </div>
     </div>
