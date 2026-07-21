@@ -18,13 +18,16 @@ export function useClinic() {
   return { clinic, loading, updateClinic };
 }
 
+// query can be a plain string (name/phone search) or { token: 'N' } for
+// today's token-number search.
 export function usePatients(query = '') {
   const [patients, setPatients] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const reload = useCallback(async () => {
     setLoading(true);
-    const { data } = await api.get('/api/patients', { params: query ? { q: query } : {} });
+    const params = typeof query === 'object' ? query : (query ? { q: query } : {});
+    const { data } = await api.get('/api/patients', { params });
     setPatients(data);
     setLoading(false);
   }, [query]);
@@ -63,7 +66,12 @@ export function useVisits(patientId) {
     return data;
   }, [patientId]);
 
-  return { addVisit };
+  const updateVisitStatus = useCallback(async (visitId, status) => {
+    const { data } = await api.patch(`/api/visits/${visitId}`, { status });
+    return data;
+  }, []);
+
+  return { addVisit, updateVisitStatus };
 }
 
 export function usePrescriptions(patientId) {
@@ -80,11 +88,12 @@ export function usePrescriptions(patientId) {
 
   useEffect(() => { if (patientId) fetchLast(); }, [patientId, fetchLast]);
 
-  const createPrescription = useCallback(async (visitId, medicines) => {
+  const createPrescription = useCallback(async (visitId, medicines, advice) => {
     const { data } = await api.post('/api/prescriptions', {
       patient_id: patientId,
       visit_id: visitId,
       medicines,
+      advice,
     });
     setLastRx(data);
     return data;
@@ -140,10 +149,37 @@ export function useBilling(range = 'day') {
 
   useEffect(() => { reload(); }, [reload]);
 
-  const recordPayment = useCallback(async (visitId, amount, paymentMode) => {
-    await api.post('/api/billing', { visit_id: visitId, amount, payment_mode: paymentMode });
+  // billing can be { amount, payment_mode } (simple) or
+  // { consultation_fee, other_charges, discount, payment_mode } (itemized)
+  const recordPayment = useCallback(async (visitId, billing) => {
+    await api.post('/api/billing', { visit_id: visitId, ...billing });
     reload();
   }, [reload]);
 
-  return { summary, loading, recordPayment };
+  const markPaid = useCallback(async (billingId) => {
+    await api.patch(`/api/billing/${billingId}`, { payment_status: 'paid' });
+    reload();
+  }, [reload]);
+
+  return { summary, loading, recordPayment, markPaid };
+}
+
+export function useReports(days = 7) {
+  const [daily, setDaily] = useState([]);
+  const [pending, setPending] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    Promise.all([
+      api.get('/api/reports/daily', { params: { days } }),
+      api.get('/api/reports/pending-payments'),
+    ]).then(([dailyRes, pendingRes]) => {
+      setDaily(dailyRes.data);
+      setPending(pendingRes.data);
+      setLoading(false);
+    });
+  }, [days]);
+
+  return { daily, pending, loading };
 }
