@@ -4,7 +4,7 @@ import { useBilling } from '../hooks/useClinicData';
 
 export default function Billing() {
   const [range, setRange] = useState('day');
-  const { summary } = useBilling(range);
+  const { summary, markPaid } = useBilling(range);
 
   return (
     <div>
@@ -38,12 +38,30 @@ export default function Billing() {
 
         <div className="space-y-2">
           {summary?.rows.map((row, i) => (
-            <div key={i} className="chit flex items-center justify-between px-5 py-3">
-              <div className="text-sm text-ink-soft">{new Date(row.created_at).toLocaleString()}</div>
-              <div className="flex items-center gap-4">
-                <span className="text-xs uppercase text-brass-deep">{row.payment_mode}</span>
-                <span className="font-medium text-ink">₹{Number(row.amount).toLocaleString('en-IN')}</span>
+            <div key={i} className="chit px-5 py-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm text-ink-soft">{new Date(row.created_at).toLocaleString()}</div>
+                  {row.invoice_number && <div className="text-xs text-brass-deep">Invoice #{row.invoice_number}</div>}
+                </div>
+                <div className="flex items-center gap-4">
+                  <span className={`text-xs uppercase font-medium ${row.payment_status === 'paid' ? 'text-sage' : 'text-clay'}`}>
+                    {row.payment_status}
+                  </span>
+                  {row.payment_status === 'pending' && row.id && (
+                    <button onClick={() => markPaid(row.id)} className="text-xs text-brass-deep hover:text-ink underline underline-offset-2">
+                      Mark Paid
+                    </button>
+                  )}
+                  <span className="text-xs uppercase text-brass-deep">{row.payment_mode}</span>
+                  <span className="font-medium text-ink">₹{Number(row.amount).toLocaleString('en-IN')}</span>
+                </div>
               </div>
+              {row.consultation_fee != null && (
+                <div className="mt-1 text-[11px] text-ink-soft">
+                  Consultation ₹{row.consultation_fee} + Other ₹{row.other_charges || 0} − Discount ₹{row.discount || 0}
+                </div>
+              )}
             </div>
           ))}
         </div>
