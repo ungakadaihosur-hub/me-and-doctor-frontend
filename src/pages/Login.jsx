@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import logo from '../assets/logo.png';
 
 export default function Login() {
   const { sendOtp, verifyOtp } = useAuth();
@@ -25,6 +26,13 @@ export default function Login() {
     }
   };
 
+  const handlePhoneChange = (e) => {
+    const digitsOnly = e.target.value.replace(/\D/g, '').slice(0, 10);
+    setPhone(digitsOnly);
+  };
+
+  const isPhoneValid = phone.length === 10;
+
   const handleVerify = async (e) => {
     e.preventDefault();
     setError('');
@@ -43,6 +51,7 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center bg-cream px-4">
       <div className="chit w-full max-w-sm px-8 py-10 mb-4">
         <div className="text-center mb-8">
+          <img src={logo} alt="Me & Doctor" className="w-20 h-20 mx-auto mb-3 object-contain" />
           <div className="font-display text-2xl text-ink">Me &amp; Doctor</div>
           <div className="font-tamil text-sm text-brass-deep mt-1">Clinic OS</div>
         </div>
@@ -53,16 +62,20 @@ export default function Login() {
               <label className="text-xs text-ink-soft font-tamil">மொபைல் எண் · Mobile number</label>
               <input
                 type="tel"
+                inputMode="numeric"
+                pattern="[0-9]{10}"
                 required
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                onChange={handlePhoneChange}
                 placeholder="98xxxxxxxx"
+                maxLength={10}
                 className="mt-1 w-full border border-ink/15 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brass"
               />
+              <div className="text-[11px] text-ink-soft mt-1">{phone.length}/10</div>
             </div>
             {error && <p className="text-clay text-xs">{error}</p>}
             <button
-              disabled={busy}
+              disabled={busy || !isPhoneValid}
               className="w-full bg-ink text-cream rounded py-2.5 font-medium hover:bg-ink-soft disabled:opacity-50"
             >
               OTP அனுப்பு · Send OTP
