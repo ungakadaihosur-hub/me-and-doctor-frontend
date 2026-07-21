@@ -2,9 +2,12 @@ import { NavLink } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 
 const links = [
-  { to: '/', label: 'இன்றைய வரிசை', sub: "Today's Queue" },
+  { to: '/', label: 'டாஷ்போர்டு', sub: 'Dashboard' },
+  { to: '/queue', label: 'இன்றைய வரிசை', sub: "Today's Queue" },
   { to: '/patients', label: 'நோயாளிகள்', sub: 'Patients' },
   { to: '/billing', label: 'வரவு', sub: 'Billing' },
+  { to: '/reports', label: 'அறிக்கைகள்', sub: 'Reports' },
+  { to: '/settings', label: 'அமைப்புகள்', sub: 'Settings' },
 ];
 
 export default function Sidebar() {
