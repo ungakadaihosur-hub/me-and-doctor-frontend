@@ -58,12 +58,20 @@ export default function Login() {
     try {
       await window.sendOtp({ identifier: `91${phone}` });
       setStage('otp');
-    } catch {
+    } catch (err) {
+      console.error('MSG91 sendOtp failed:', err);
       setError('OTP அனுப்ப முடியவில்லை. மீண்டும் முயற்சிக்கவும்.');
     } finally {
       setBusy(false);
     }
   };
+
+  const handleOtpChange = (e) => {
+    const digitsOnly = e.target.value.replace(/\D/g, '').slice(0, 6);
+    setOtp(digitsOnly);
+  };
+
+  const isOtpValid = otp.length === 6;
 
   const handleVerify = async (e) => {
     e.preventDefault();
@@ -125,16 +133,20 @@ export default function Login() {
               <label className="text-xs text-ink-soft font-tamil">OTP</label>
               <input
                 type="text"
+                inputMode="numeric"
+                pattern="[0-9]{6}"
                 required
                 value={otp}
-                onChange={(e) => setOtp(e.target.value)}
+                onChange={handleOtpChange}
                 placeholder="______"
+                maxLength={6}
                 className="mt-1 w-full border border-ink/15 rounded px-3 py-2 tracking-widest text-center focus:outline-none focus:ring-2 focus:ring-brass"
               />
+              <div className="text-[11px] text-ink-soft mt-1 text-center">{otp.length}/6</div>
             </div>
             {error && <p className="text-clay text-xs">{error}</p>}
             <button
-              disabled={busy}
+              disabled={busy || !isOtpValid}
               className="w-full bg-brass text-ink rounded py-2.5 font-medium hover:bg-brass-deep hover:text-cream disabled:opacity-50"
             >
               உள்நுழை · Login
