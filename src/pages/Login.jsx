@@ -1,30 +1,48 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import logo from '../assets/logo.png';
 
+const WIDGET_ID = import.meta.env.VITE_MSG91_WIDGET_ID;
+const TOKEN_AUTH = import.meta.env.VITE_MSG91_TOKEN_AUTH;
+
 export default function Login() {
-  const { sendOtp, verifyOtp } = useAuth();
+  const { verifyWidgetToken } = useAuth();
   const navigate = useNavigate();
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
   const [stage, setStage] = useState('phone'); // phone -> otp
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const widgetReady = useRef(false);
 
-  const handleSendOtp = async (e) => {
-    e.preventDefault();
-    setError('');
-    setBusy(true);
-    try {
-      await sendOtp(phone);
-      setStage('otp');
-    } catch {
-      setError('OTP அனுப்ப முடியவில்லை. மீண்டும் முயற்சிக்கவும்.');
-    } finally {
-      setBusy(false);
+  // Loads MSG91's widget script once. exposeMethods:true means MSG91's
+  // own popup UI never shows — we keep our own "chit"-styled form and
+  // just call window.sendOtp / window.verifyOtp ourselves.
+  useEffect(() => {
+    if (!WIDGET_ID || !TOKEN_AUTH) {
+      setError('MSG91 widget-க்கு VITE_MSG91_WIDGET_ID / VITE_MSG91_TOKEN_AUTH env vars set பண்ணவில்லை.');
+      return;
     }
-  };
+
+    window.configuration = {
+      widgetId: WIDGET_ID,
+      tokenAuth: TOKEN_AUTH,
+      exposeMethods: true,
+      success: () => {},
+      failure: () => {},
+    };
+
+    const script = document.createElement('script');
+    script.src = 'https://verify.msg91.com/otp-provider.js';
+    script.onload = () => {
+      window.initSendOTP(window.configuration);
+      widgetReady.current = true;
+    };
+    document.body.appendChild(script);
+
+    return () => { document.body.removeChild(script); };
+  }, []);
 
   const handlePhoneChange = (e) => {
     const digitsOnly = e.target.value.replace(/\D/g, '').slice(0, 10);
@@ -33,12 +51,32 @@ export default function Login() {
 
   const isPhoneValid = phone.length === 10;
 
+  const handleSendOtp = async (e) => {
+    e.preventDefault();
+    setError('');
+    setBusy(true);
+    try {
+      await window.sendOtp({ identifier: `91${phone}` });
+      setStage('otp');
+    } catch {
+      setError('OTP அனுப்ப முடியவில்லை. மீண்டும் முயற்சிக்கவும்.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const handleVerify = async (e) => {
     e.preventDefault();
     setError('');
     setBusy(true);
     try {
-      await verifyOtp(phone, otp);
+      const response = await window.verifyOtp(otp);
+      // MSG91 returns the access-token in `message` on success — the
+      // backend re-verifies this token server-side before trusting it.
+      const accessToken = response?.message;
+      if (!accessToken) throw new Error('no_access_token');
+
+      await verifyWidgetToken(accessToken);
       navigate('/');
     } catch {
       setError('தவறான OTP. மீண்டும் முயற்சிக்கவும்.');
