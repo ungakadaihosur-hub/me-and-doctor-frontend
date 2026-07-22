@@ -10,11 +10,19 @@ const links = [
   { to: '/settings', label: 'அமைப்புகள்', sub: 'Settings' },
 ];
 
-export default function Sidebar() {
+// `open`/`onClose` only matter below the md breakpoint — on desktop,
+// `md:translate-x-0` always shows the sidebar regardless of `open`,
+// so this component's desktop rendering is unchanged from before.
+export default function Sidebar({ open, onClose }) {
   const { logout } = useAuth();
 
   return (
-    <aside className="w-56 shrink-0 bg-ink text-cream min-h-screen flex flex-col">
+    <aside
+      className={`fixed inset-y-0 left-0 z-40 w-56 shrink-0 bg-ink text-cream min-h-screen flex flex-col
+        transform transition-transform duration-200 ease-in-out
+        md:static md:translate-x-0
+        ${open ? 'translate-x-0' : '-translate-x-full'}`}
+    >
       <div className="px-5 py-6 border-b border-white/10">
         <div className="font-display text-lg tracking-wide">Me &amp; Doctor</div>
         <div className="text-xs text-brass mt-0.5 font-tamil">Clinic OS</div>
@@ -26,6 +34,7 @@ export default function Sidebar() {
             key={l.to}
             to={l.to}
             end={l.to === '/'}
+            onClick={onClose}
             className={({ isActive }) =>
               `block rounded px-3 py-2.5 transition-colors ${
                 isActive ? 'bg-brass text-ink' : 'hover:bg-white/10 text-cream'
@@ -39,7 +48,7 @@ export default function Sidebar() {
       </nav>
 
       <button
-        onClick={logout}
+        onClick={() => { logout(); onClose?.(); }}
         className="mx-3 mb-5 text-left text-xs text-cream/60 hover:text-clay px-3 py-2"
       >
         வெளியேறு · Sign out
