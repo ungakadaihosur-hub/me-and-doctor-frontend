@@ -20,6 +20,15 @@ export function AuthProvider({ children }) {
     setClaims(data.claims);
   }, []);
 
+  // MSG91 OTP Widget flow: frontend gets an access-token directly from
+  // MSG91 after send/verify; this exchanges it for our own session.
+  const verifyWidgetToken = useCallback(async (accessToken) => {
+    const { data } = await api.post('/api/auth/verify-widget-token', { accessToken });
+    localStorage.setItem('me_and_doctor_token', data.token);
+    localStorage.setItem('me_and_doctor_claims', JSON.stringify(data.claims));
+    setClaims(data.claims);
+  }, []);
+
   const logout = useCallback(() => {
     localStorage.removeItem('me_and_doctor_token');
     localStorage.removeItem('me_and_doctor_claims');
@@ -27,7 +36,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ claims, sendOtp, verifyOtp, logout }}>
+    <AuthContext.Provider value={{ claims, sendOtp, verifyOtp, verifyWidgetToken, logout }}>
       {children}
     </AuthContext.Provider>
   );
