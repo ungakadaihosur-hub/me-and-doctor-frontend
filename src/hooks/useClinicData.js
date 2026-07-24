@@ -150,10 +150,12 @@ export function useBilling(range = 'day') {
   useEffect(() => { reload(); }, [reload]);
 
   // billing can be { amount, payment_mode } (simple) or
-  // { consultation_fee, other_charges, discount, payment_mode } (itemized)
+  // { consultation_fee, other_charges, discount, payment_mode } (itemized).
+  // Returns the created bill (used for the invoice PDF link).
   const recordPayment = useCallback(async (visitId, billing) => {
-    await api.post('/api/billing', { visit_id: visitId, ...billing });
+    const { data } = await api.post('/api/billing', { visit_id: visitId, ...billing });
     reload();
+    return data;
   }, [reload]);
 
   const markPaid = useCallback(async (billingId) => {
