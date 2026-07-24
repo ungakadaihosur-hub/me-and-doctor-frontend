@@ -16,6 +16,7 @@ export default function PatientDetail() {
   const [vitals, setVitals] = useState({ bp: '', sugar: '', weight: '' });
   const [notes, setNotes] = useState('');
   const [diagnosis, setDiagnosis] = useState('');
+  const [labTests, setLabTests] = useState('');
   const [followUpDate, setFollowUpDate] = useState('');
   const [medicines, setMedicines] = useState([{ name: '', dosage: '', frequency: '', duration: '' }]);
   const [advice, setAdvice] = useState('');
@@ -24,7 +25,7 @@ export default function PatientDetail() {
   const [saving, setSaving] = useState(false);
 
   const [billing, setBilling] = useState({ consultation_fee: '', other_charges: '', discount: '', payment_mode: 'cash' });
-  const [billingSaved, setBillingSaved] = useState(false);
+  const [savedBill, setSavedBill] = useState(null);
 
   const updateMedicine = (i, field, value) => {
     setMedicines((prev) => prev.map((m, idx) => (idx === i ? { ...m, [field]: value } : m)));
@@ -46,6 +47,7 @@ export default function PatientDetail() {
         chief_complaint: chiefComplaint,
         soap_notes: notes,
         diagnosis,
+        lab_tests: labTests,
         vitals,
         follow_up_date: followUpDate || null,
       });
@@ -60,6 +62,7 @@ export default function PatientDetail() {
       setChiefComplaint('');
       setNotes('');
       setDiagnosis('');
+      setLabTests('');
       setFollowUpDate('');
       setAdvice('');
       setVitals({ bp: '', sugar: '', weight: '' });
@@ -82,13 +85,13 @@ export default function PatientDetail() {
   const handleSaveBilling = async (e) => {
     e.preventDefault();
     if (!savedVisit) return;
-    await recordPayment(savedVisit.id, {
+    const bill = await recordPayment(savedVisit.id, {
       consultation_fee: Number(billing.consultation_fee || 0),
       other_charges: Number(billing.other_charges || 0),
       discount: Number(billing.discount || 0),
       payment_mode: billing.payment_mode,
     });
-    setBillingSaved(true);
+    setSavedBill(bill);
   };
 
   if (!patient) return null;
@@ -131,6 +134,7 @@ export default function PatientDetail() {
                   {v.chief_complaint && <p className="text-xs text-ink-soft mt-1">CC: {v.chief_complaint}</p>}
                   {v.diagnosis && <p className="text-sm text-ink font-medium mt-1">{v.diagnosis}</p>}
                   {v.soap_notes && <p className="text-sm text-ink mt-1">{v.soap_notes}</p>}
+                  {v.lab_tests && <p className="text-xs text-ink-soft mt-1">Lab/Test: {v.lab_tests}</p>}
                   {v.follow_up_date && (
                     <p className="text-xs text-clay mt-1">அடுத்த வருகை: {new Date(v.follow_up_date).toLocaleDateString()}</p>
                   )}
@@ -168,7 +172,10 @@ export default function PatientDetail() {
             <h2 className="font-display text-lg text-ink mb-3">கட்டண வரலாறு · Payment History</h2>
             <div className="space-y-2">
               {(patient.bills || []).map((b) => (
-                <div key={b.id} className="chit flex justify-between px-5 py-3">
+                <a key={b.id}
+                  href={`${import.meta.env.VITE_API_BASE_URL}/api/billing/${b.id}/pdf`}
+                  target="_blank" rel="noreferrer"
+                  className="chit flex justify-between px-5 py-3 hover:bg-parchment">
                   <div>
                     <div className="text-xs text-brass-deep">{new Date(b.created_at).toLocaleDateString()}</div>
                     {b.invoice_number && <div className="text-xs text-ink-soft">Invoice #{b.invoice_number}</div>}
@@ -177,7 +184,7 @@ export default function PatientDetail() {
                     <div className={`text-xs uppercase ${b.payment_status === 'paid' ? 'text-sage' : 'text-clay'}`}>{b.payment_status}</div>
                     <div className="font-medium text-ink">₹{Number(b.amount).toLocaleString('en-IN')}</div>
                   </div>
-                </div>
+                </a>
               ))}
               {(patient.bills || []).length === 0 && <p className="text-sm text-ink-soft">பில்கள் இல்லை.</p>}
             </div>
@@ -219,6 +226,13 @@ export default function PatientDetail() {
               placeholder="நோய் கண்டறிதல் · Diagnosis"
               value={diagnosis}
               onChange={(e) => setDiagnosis(e.target.value)}
+              className="w-full border border-ink/15 rounded px-3 py-2 text-sm"
+              rows={2}
+            />
+            <textarea
+              placeholder="Lab / Test பரிந்துரைகள் · Lab/Test Recommendations"
+              value={labTests}
+              onChange={(e) => setLabTests(e.target.value)}
               className="w-full border border-ink/15 rounded px-3 py-2 text-sm"
               rows={2}
             />
@@ -291,7 +305,7 @@ export default function PatientDetail() {
               </div>
             )}
 
-            {savedVisit && !billingSaved && (
+            {savedVisit && !savedBill && (
               <form onSubmit={handleSaveBilling} className="border-t border-ink/10 pt-4 space-y-2">
                 <span className="text-sm font-medium text-ink">பில்லிங் · Billing for this visit</span>
                 <div className="grid grid-cols-3 gap-2">
@@ -316,7 +330,16 @@ export default function PatientDetail() {
                 </button>
               </form>
             )}
-            {billingSaved && <p className="text-sm text-sage">பில் பதிவு செய்யப்பட்டது ✓</p>}
+            {savedBill && (
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-sage">பில் பதிவு செய்யப்பட்டது ✓ (Invoice #{savedBill.invoice_number})</p>
+                <a href={`${import.meta.env.VITE_API_BASE_URL}/api/billing/${savedBill.id}/pdf`}
+                  target="_blank" rel="noreferrer"
+                  className="text-xs text-brass-deep hover:text-ink underline underline-offset-2">
+                  Invoice PDF
+                </a>
+              </div>
+            )}
           </div>
         </div>
       </div>
