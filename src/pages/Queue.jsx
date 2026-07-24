@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import Header from '../components/Header';
 import { useQueue, usePatients } from '../hooks/useClinicData';
 
@@ -64,7 +65,7 @@ export default function Queue() {
                 <div className="mt-2 text-sm text-ink">{t.patients?.name || 'Walk-in'}</div>
 
                 {!isFinal && (
-                  <div className="flex gap-3 mt-4">
+                  <div className="flex flex-wrap gap-3 mt-4">
                     <button
                       onClick={() => updateStatus(t.id, NEXT_STATUS[t.status])}
                       className="text-xs font-medium text-brass-deep hover:text-ink underline underline-offset-2"
@@ -78,6 +79,22 @@ export default function Queue() {
                       ரத்து · Cancel
                     </button>
                   </div>
+                )}
+
+                {/* Connects the queue directly to the visit workflow —
+                    previously the doctor had to separately search for
+                    the patient in the Patients tab to do anything. */}
+                {t.patient_id ? (
+                  <Link
+                    to={`/patients/${t.patient_id}`}
+                    className="mt-3 inline-block text-xs font-medium bg-brass text-ink rounded px-3 py-1.5 hover:bg-brass-deep hover:text-cream"
+                  >
+                    நோயாளி பதிவைத் திற · Open Consultation
+                  </Link>
+                ) : (
+                  <p className="mt-3 text-[11px] text-ink-soft">
+                    Walk-in — ஆலோசனை பதிவு செய்ய முதலில் Patients-ல் பதிவு செய்யுங்கள்
+                  </p>
                 )}
               </div>
             );
