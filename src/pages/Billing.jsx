@@ -42,7 +42,19 @@ export default function Billing() {
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-sm text-ink-soft">{new Date(row.created_at).toLocaleString()}</div>
-                  {row.invoice_number && <div className="text-xs text-brass-deep">Invoice #{row.invoice_number}</div>}
+                  {row.invoice_number && (
+                    row.id ? (
+                      <a
+                        href={`${import.meta.env.VITE_API_BASE_URL}/api/billing/${row.id}/pdf`}
+                        target="_blank" rel="noreferrer"
+                        className="text-xs text-brass-deep hover:text-ink underline underline-offset-2"
+                      >
+                        Invoice #{row.invoice_number}
+                      </a>
+                    ) : (
+                      <div className="text-xs text-brass-deep">Invoice #{row.invoice_number}</div>
+                    )
+                  )}
                 </div>
                 <div className="flex items-center gap-4">
                   <span className={`text-xs uppercase font-medium ${row.payment_status === 'paid' ? 'text-sage' : 'text-clay'}`}>
