@@ -1,62 +1,38 @@
-import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { useMsg91Widget } from '../hooks/useMsg91Widget';
 import logo from '../assets/logo.png';
-
-const WIDGET_ID = import.meta.env.VITE_MSG91_WIDGET_ID;
-const TOKEN_AUTH = import.meta.env.VITE_MSG91_TOKEN_AUTH;
 
 export default function Login() {
   const { verifyWidgetToken } = useAuth();
+  const { ready, configError, sendOtp, verifyOtp } = useMsg91Widget();
   const navigate = useNavigate();
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
   const [stage, setStage] = useState('phone'); // phone -> otp
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  const widgetReady = useRef(false);
-
-  // Loads MSG91's widget script once. exposeMethods:true means MSG91's
-  // own popup UI never shows — we keep our own "chit"-styled form and
-  // just call window.sendOtp / window.verifyOtp ourselves.
-  useEffect(() => {
-    if (!WIDGET_ID || !TOKEN_AUTH) {
-      setError('MSG91 widget-க்கு VITE_MSG91_WIDGET_ID / VITE_MSG91_TOKEN_AUTH env vars set பண்ணவில்லை.');
-      return;
-    }
-
-    window.configuration = {
-      widgetId: WIDGET_ID,
-      tokenAuth: TOKEN_AUTH,
-      exposeMethods: true,
-      success: () => {},
-      failure: () => {},
-    };
-
-    const script = document.createElement('script');
-    script.src = 'https://verify.msg91.com/otp-provider.js';
-    script.onload = () => {
-      window.initSendOTP(window.configuration);
-      widgetReady.current = true;
-    };
-    document.body.appendChild(script);
-
-    return () => { document.body.removeChild(script); };
-  }, []);
 
   const handlePhoneChange = (e) => {
     const digitsOnly = e.target.value.replace(/\D/g, '').slice(0, 10);
     setPhone(digitsOnly);
   };
 
+  const handleOtpChange = (e) => {
+    const digitsOnly = e.target.value.replace(/\D/g, '').slice(0, 6);
+    setOtp(digitsOnly);
+  };
+
   const isPhoneValid = phone.length === 10;
+  const isOtpValid = otp.length === 6;
 
   const handleSendOtp = async (e) => {
     e.preventDefault();
     setError('');
     setBusy(true);
     try {
-      await window.sendOtp({ identifier: `91${phone}` });
+      await sendOtp(`91${phone}`);
       setStage('otp');
     } catch (err) {
       console.error('MSG91 sendOtp failed:', err);
@@ -66,27 +42,16 @@ export default function Login() {
     }
   };
 
-  const handleOtpChange = (e) => {
-    const digitsOnly = e.target.value.replace(/\D/g, '').slice(0, 6);
-    setOtp(digitsOnly);
-  };
-
-  const isOtpValid = otp.length === 6;
-
   const handleVerify = async (e) => {
     e.preventDefault();
     setError('');
     setBusy(true);
     try {
-      const response = await window.verifyOtp(otp);
-      // MSG91 returns the access-token in `message` on success — the
-      // backend re-verifies this token server-side before trusting it.
-      const accessToken = response?.message;
-      if (!accessToken) throw new Error('no_access_token');
-
+      const accessToken = await verifyOtp(otp);
       await verifyWidgetToken(accessToken);
       navigate('/');
-    } catch {
+    } catch (err) {
+      console.error('OTP verify / session exchange failed:', err);
       setError('தவறான OTP. மீண்டும் முயற்சிக்கவும்.');
     } finally {
       setBusy(false);
@@ -101,6 +66,8 @@ export default function Login() {
           <div className="font-display text-2xl text-ink">Me &amp; Doctor</div>
           <div className="font-tamil text-sm text-brass-deep mt-1">Clinic OS</div>
         </div>
+
+        {configError && <p className="text-clay text-xs mb-4 text-center">{configError}</p>}
 
         {stage === 'phone' ? (
           <form onSubmit={handleSendOtp} className="space-y-4">
@@ -121,10 +88,10 @@ export default function Login() {
             </div>
             {error && <p className="text-clay text-xs">{error}</p>}
             <button
-              disabled={busy || !isPhoneValid}
+              disabled={busy || !isPhoneValid || !ready}
               className="w-full bg-ink text-cream rounded py-2.5 font-medium hover:bg-ink-soft disabled:opacity-50"
             >
-              OTP அனுப்பு · Send OTP
+              {ready ? 'OTP அனுப்பு · Send OTP' : 'ஏற்றுகிறது... · Loading...'}
             </button>
           </form>
         ) : (
@@ -153,6 +120,10 @@ export default function Login() {
             </button>
           </form>
         )}
+
+        <p className="text-center text-xs text-ink-soft mt-6">
+          புதிய கிளினிக்-ஆ? <Link to="/onboarding" className="text-brass-deep underline underline-offset-2">பதிவு செய்யுங்கள்</Link> · New clinic? <Link to="/onboarding" className="text-brass-deep underline underline-offset-2">Register</Link>
+        </p>
       </div>
     </div>
   );
